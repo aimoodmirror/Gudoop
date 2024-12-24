@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Model Test</title>
-  <!-- TensorFlow.js Library -->
+  <title>AI Mood Mirror</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -20,50 +18,35 @@
       max-width: 300px;
     }
     canvas {
-      display: none;
+      position: absolute;
     }
   </style>
 </head>
 <body>
-  <h1>Test Your AI Model</h1>
-  <p id="status">Loading the model...</p>
+  <h1>Test Your AI Mood Mirror</h1>
+  <p id="status">Loading model...</p>
 
   <div id="input-container">
     <input type="file" id="imageInput" accept="image/*">
-    <p>Upload an image to test the model</p>
+    <p>Upload an image to detect faces</p>
     <img id="preview" src="" alt="Image Preview">
   </div>
 
   <div id="result">
     <h2>Prediction:</h2>
-    <p id="prediction">No prediction yet</p>
+    <p id="prediction">Detecting faces...</p>
   </div>
 
-  <canvas id="hiddenCanvas"></canvas>
-
   <script>
-    // Replace this with the correct raw URL for your GitHub-hosted model.json file
-    const modelURL = 'https://raw.githubusercontent.com/aimoodmirror/Gudoop/refs/heads/main/model.json';
-
-
-    let model;
-
-    // Function to load the model
-    async function loadModel() {
-      try {
-        model = await tf.loadLayersModel(modelURL);
-        console.log('Model loaded successfully:', model);
-        document.getElementById('status').innerText = 'Model loaded successfully!';
-      } catch (error) {
-        console.error('Error loading model:', error);
-        document.getElementById('status').innerText = 'Failed to load the model. Check your URL.';
-      }
+    // Load the face-api.js models from GitHub
+    async function loadFaceApiModels() {
+      await faceapi.nets.ssdMobilenetv1.loadFromUri('https://raw.githubusercontent.com/aimoodmirror/Gudoop/main/models');
+      document.getElementById('status').innerText = 'Models loaded!';
     }
 
-    // Call the loadModel function
-    loadModel();
+    loadFaceApiModels();
 
-    // Handle image upload and prediction
+    // Handle image upload and face detection
     document.getElementById('imageInput').addEventListener('change', async (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -72,33 +55,26 @@
       const preview = document.getElementById('preview');
       preview.src = URL.createObjectURL(file);
 
-      // Draw the image onto a hidden canvas to process it
-      const canvas = document.getElementById('hiddenCanvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.src = preview.src;
+      // Wait for the image to load
+      preview.onload = async () => {
+        // Create a canvas to draw the image on
+        const canvas = faceapi.createCanvasFromMedia(preview);
+        document.body.append(canvas);
+        const displaySize = { width: preview.width, height: preview.height };
+        faceapi.matchDimensions(canvas, displaySize);
 
-      img.onload = async () => {
-        // Resize canvas to match the image
-        canvas.width = 224; // Input size for the model
-        canvas.height = 224;
-        ctx.drawImage(img, 0, 0, 224, 224);
+        // Detect faces
+        const detections = await faceapi.detectAllFaces(preview).withFaceLandmarks().withFaceDescriptors();
 
-        // Get image data from canvas
-        const imageData = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255.0);
-
-        // Make prediction using the model
-        try {
-          const prediction = model.predict(imageData);
-          const result = await prediction.array();
-          console.log('Prediction result:', result);
-
-          // Display the prediction
-          document.getElementById('prediction').innerText = Prediction: ${result[0]};
-        } catch (error) {
-          console.error('Error during prediction:', error);
-          document.getElementById('prediction').innerText = 'Prediction failed.';
-        }
+        // Display the detected faces
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        canvas?.clear();
+        canvas?.drawDetections(resizedDetections);
+        canvas?.drawFaceLandmarks(resizedDetections);
+        canvas?.drawFaceDescriptors(resizedDetections);
+        
+        // Show how many faces are detected
+        document.getElementById('prediction').innerText = `Faces detected: ${detections.length}`;
       };
     });
   </script>
