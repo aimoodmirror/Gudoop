@@ -8,22 +8,57 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 20px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #f9f9f9;
     }
-    #input-container {
-      margin-top: 20px;
+    h1 {
+      margin: 20px;
+      color: #333;
+    }
+    #input-container, #result {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      width: 90%;
+      max-width: 400px;
+      margin: 10px 0;
     }
     img {
-      max-width: 300px;
+      max-width: 100%;
+      border-radius: 10px;
     }
-    canvas {
-      position: absolute;
+    .progress-bar-container {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+    }
+    .progress-bar-label {
+      width: 80px;
+      text-align: left;
+      font-size: 14px;
+      color: #555;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 10px;
+      background: #e0e0e0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #ff6b6b, #ffa36b);
     }
   </style>
 </head>
 <body>
-  <h1>Test Your AI Mood Mirror</h1>
+  <h1>AI Mood Mirror</h1>
   <p id="status">Loading model...</p>
 
   <div id="input-container">
@@ -35,46 +70,42 @@
   <div id="result">
     <h2>Prediction:</h2>
     <p id="prediction">Detecting faces...</p>
+    <div class="progress-bar-container">
+      <span class="progress-bar-label">Angry</span>
+      <div class="progress-bar"><span id="angry-bar" style="width: 0%;"></span></div>
+    </div>
+    <div class="progress-bar-container">
+      <span class="progress-bar-label">Happy</span>
+      <div class="progress-bar"><span id="happy-bar" style="width: 0%;"></span></div>
+    </div>
+    <!-- Add more progress bars for other emotions -->
   </div>
 
   <script>
-    // Load the face-api.js models from GitHub
     async function loadFaceApiModels() {
       await faceapi.nets.ssdMobilenetv1.loadFromUri('https://raw.githubusercontent.com/aimoodmirror/Gudoop/main/models');
       document.getElementById('status').innerText = 'Models loaded!';
     }
-
     loadFaceApiModels();
 
-    // Handle image upload and face detection
     document.getElementById('imageInput').addEventListener('change', async (event) => {
       const file = event.target.files[0];
       if (!file) return;
 
-      // Display the image preview
       const preview = document.getElementById('preview');
       preview.src = URL.createObjectURL(file);
 
-      // Wait for the image to load
       preview.onload = async () => {
-        // Create a canvas to draw the image on
-        const canvas = faceapi.createCanvasFromMedia(preview);
-        document.body.append(canvas);
-        const displaySize = { width: preview.width, height: preview.height };
-        faceapi.matchDimensions(canvas, displaySize);
-
-        // Detect faces
-        const detections = await faceapi.detectAllFaces(preview).withFaceLandmarks().withFaceDescriptors();
-
-        // Display the detected faces
-        const resizedDetections = faceapi.resizeResults(detections, displaySize);
-        canvas?.clear();
-        canvas?.drawDetections(resizedDetections);
-        canvas?.drawFaceLandmarks(resizedDetections);
-        canvas?.drawFaceDescriptors(resizedDetections);
-        
-        // Show how many faces are detected
+        const detections = await faceapi.detectAllFaces(preview);
         document.getElementById('prediction').innerText = `Faces detected: ${detections.length}`;
+
+        if (detections.length === 0) {
+          alert("No faces detected.");
+        }
+
+        // Update progress bars dynamically
+        document.getElementById('angry-bar').style.width = '30%'; // Example value
+        document.getElementById('happy-bar').style.width = '70%'; // Example value
       };
     });
   </script>
