@@ -3,109 +3,118 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Mood Mirror</title>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <title>AI Model Test</title>
+  <!-- TensorFlow.js Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background-color: #f9f9f9;
-    }
-    h1 {
+      text-align: center;
       margin: 20px;
-      color: #333;
+      background-color: #f4f4f9;
     }
     #input-container, #result {
       background: #fff;
+      padding: 20px;
       border-radius: 10px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      padding: 20px;
-      width: 90%;
+      margin: 20px auto;
       max-width: 400px;
-      margin: 10px 0;
     }
     img {
       max-width: 100%;
       border-radius: 10px;
     }
-    .progress-bar-container {
-      display: flex;
-      align-items: center;
-      margin: 10px 0;
+    canvas {
+      display: none;
     }
-    .progress-bar-label {
-      width: 80px;
-      text-align: left;
+    .loading {
       font-size: 14px;
-      color: #555;
-    }
-    .progress-bar {
-      width: 100%;
-      height: 10px;
-      background: #e0e0e0;
-      border-radius: 5px;
-      overflow: hidden;
-    }
-    .progress-bar span {
-      display: block;
-      height: 100%;
-      background: linear-gradient(90deg, #ff6b6b, #ffa36b);
+      color: #888;
     }
   </style>
 </head>
 <body>
-  <h1>AI Mood Mirror</h1>
-  <p id="status">Loading model...</p>
+  <h1>Test Your AI Model</h1>
+  <p id="status">Loading the model...</p>
 
   <div id="input-container">
     <input type="file" id="imageInput" accept="image/*">
-    <p>Upload an image to detect faces</p>
+    <p>Upload an image to test the model</p>
     <img id="preview" src="" alt="Image Preview">
   </div>
 
   <div id="result">
     <h2>Prediction:</h2>
-    <p id="prediction">Detecting faces...</p>
-    <div class="progress-bar-container">
-      <span class="progress-bar-label">Angry</span>
-      <div class="progress-bar"><span id="angry-bar" style="width: 0%;"></span></div>
-    </div>
-    <div class="progress-bar-container">
-      <span class="progress-bar-label">Happy</span>
-      <div class="progress-bar"><span id="happy-bar" style="width: 0%;"></span></div>
-    </div>
-    <!-- Add more progress bars for other emotions -->
+    <p id="prediction" class="loading">No prediction yet</p>
   </div>
 
-  <script>
-    async function loadFaceApiModels() {
-      await faceapi.nets.ssdMobilenetv1.loadFromUri('https://raw.githubusercontent.com/aimoodmirror/Gudoop/main/models');
-      document.getElementById('status').innerText = 'Models loaded!';
-    }
-    loadFaceApiModels();
+  <canvas id="hiddenCanvas"></canvas>
 
+  <script>
+    // Replace this with the correct raw URL for your GitHub-hosted model.json file
+    const modelURL = 'https://raw.githubusercontent.com/aimoodmirror/Gudoop/main/model.json';
+
+    let model;
+
+    // Function to load the model
+    async function loadModel() {
+      try {
+        model = await tf.loadLayersModel(modelURL);
+        console.log('Model loaded successfully:', model);
+        document.getElementById('status').innerText = 'Model loaded successfully!';
+      } catch (error) {
+        console.error('Error loading model:', error);
+        document.getElementById('status').innerText = 'Failed to load the model. Check your URL.';
+      }
+    }
+
+    // Call the loadModel function
+    loadModel();
+
+    // Handle image upload and prediction
     document.getElementById('imageInput').addEventListener('change', async (event) => {
       const file = event.target.files[0];
       if (!file) return;
 
+      // Display the image preview
       const preview = document.getElementById('preview');
       preview.src = URL.createObjectURL(file);
 
-      preview.onload = async () => {
-        const detections = await faceapi.detectAllFaces(preview);
-        document.getElementById('prediction').innerText = `Faces detected: ${detections.length}`;
+      // Draw the image onto a hidden canvas to process it
+      const canvas = document.getElementById('hiddenCanvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.src = preview.src;
 
-        if (detections.length === 0) {
-          alert("No faces detected.");
+      // Show a loading message
+      document.getElementById('prediction').innerText = 'Processing...';
+
+      img.onload = async () => {
+        try {
+          // Resize canvas to match the image
+          canvas.width = 224; // Input size for the model
+          canvas.height = 224;
+          ctx.drawImage(img, 0, 0, 224, 224);
+
+          // Get image data from canvas
+          const imageData = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255.0);
+
+          // Make prediction using the model
+          const prediction = model.predict(imageData);
+          const result = await prediction.array();
+
+          // Map the result to a readable output
+          const categories = ['Happy', 'Sad', 'Neutral', 'Angry']; // Example categories
+          const predictionIndex = result[0].indexOf(Math.max(...result[0])); // Get the highest score index
+          const predictionText = categories[predictionIndex];
+
+          // Display the prediction
+          document.getElementById('prediction').innerText = `Prediction: ${predictionText} (${(Math.max(...result[0]) * 100).toFixed(2)}%)`;
+        } catch (error) {
+          console.error('Error during prediction:', error);
+          document.getElementById('prediction').innerText = 'Prediction failed.';
         }
-
-        // Update progress bars dynamically
-        document.getElementById('angry-bar').style.width = '30%'; // Example value
-        document.getElementById('happy-bar').style.width = '70%'; // Example value
       };
     });
   </script>
